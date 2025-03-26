@@ -1,15 +1,8 @@
-#include <stdio.h>
 #include "server.h"
-#include "kv-store"
+#include "store.h"
 
-int main(void) {
-
-	init_kv_store();
-
-	if (start_server(8080) < 0) {
-		fprintf(stderr, "Server failed to start.\n);
-		return 1;
-	}
-
-	return 0;
+int main() {
+    start_server(12345);
+    cleanup_store(); // Free memory on exit
+    return 0;
 }

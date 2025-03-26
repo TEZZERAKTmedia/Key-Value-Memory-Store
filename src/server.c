@@ -8,48 +8,46 @@
 #define BACKLOG 5
 
 int start_server(int port) {
-	int server_fd, client_fd;
-	struct sockaddr_in server_addr, client_addr;
-	sockIen_t client_len = sizeof(client_addr);
+    int server_fd, client_fd;
+    struct sockaddr_in address;
+    char buffer[2048];
+    socklen_t addrlen = sizeof(address);
 
-	server_fd = socket(AF_INET, SOCK_STREAM, 0);
-	 if (server_fd < 0) {
-		perror("socket");
-		return -1;
+    if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
+        perror("Socket failed");
+        exit(EXIT_FAILURE);
+    }
 
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = INADDR_ANY;
+    address.sin_port = htons(port);
 
-	}
+    if (bind(server_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
+        perror("Bind failed");
+        exit(EXIT_FAILURE);
+    }
 
-	memset(&server_addr, 0, sizeof(server_addr));
-	server_addr.sin_family = AF_INET;
-	server_addr.sin_addr.s_addr = INADDR_ANY;
-	server_addr.sin_port = htons(port);
+    if (listen(server_fd, 3) < 0) {
+        perror("Listen failed");
+        exit(EXIT_FAILURE);
+    }
 
-	if (bind(server_fd, (struct sockaddr*)&server_addr, sizeof(server_addr)) <0) {
-		perror("bind");
-		close(server_fd);
-		return -1;
-	}
+    printf("Server listening on port %d...\n", port);
 
-	if (listen(server_fd, BACKLOG) < 0); {
-		perror("listen");
-		close(server_fd);
-		return -1;
-	}
+    while ((client_fd = accept(server_fd, (struct sockaddr *)&address, &addrlen)) >= 0) {
+        printf("Accepted a connection!\n");
 
-	printf("Server listening on port %d...\n", port);
+        int valread;
+        while ((valread = read(client_fd, buffer, sizeof(buffer) - 1)) > 0) {
+            buffer[valread] = '\0';
+            printf("Received: %s\n", buffer);
 
-	client_fd = accept(server_fd, (struct sockaddr*)&client_addr, &client_len);
-	if (client_fd < 0) {
-		perror("accept");
-		close(server_fd);
-		return -1;
-	}
+            // Echo back or process commands here
+            write(client_fd, "OK\n", 3);
+        }
 
-	printf("Accepted a connection!\n");
+        close(client_fd);
+    }
 
-
-	close(client_fd);
-	close(server_fd);
-	return 0;
+    return 0;
 }
