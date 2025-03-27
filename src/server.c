@@ -1,4 +1,5 @@
 #include "server.h"
+#include "store.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -6,6 +7,8 @@
 #include <arpa/inet.h>
 
 #define BACKLOG 5
+#define MAX_KEY_LEN 256
+#define MAX_VALUE_LEN 1024
 
 int start_server(int port) {
     int server_fd, client_fd;
@@ -27,7 +30,7 @@ int start_server(int port) {
         exit(EXIT_FAILURE);
     }
 
-    if (listen(server_fd, 3) < 0) {
+    if (listen(server_fd, BACKLOG) < 0) {
         perror("Listen failed");
         exit(EXIT_FAILURE);
     }
@@ -42,8 +45,58 @@ int start_server(int port) {
             buffer[valread] = '\0';
             printf("Received: %s\n", buffer);
 
-            // Echo back or process commands here
-            write(client_fd, "OK\n", 3);
+            char *command = strtok(buffer, " ");
+            if (command && strcmp(command, "SET") == 0) {
+                char *key = strtok(NULL, " ");
+                char *value = strtok(NULL, "\n");
+
+                if (key && value) {
+                    if (strlen(key) > MAX_KEY_LEN || strlen(value) > MAX_VALUE_LEN) {
+                        write(client_fd, "ERROR: Key or value too long\n", 30);
+                        continue;
+                    }
+                    set(key, value);
+                    write(client_fd, "OK\n", 3);
+                } else {
+                    write(client_fd, "ERROR: Invalid SET\n", 19);
+                }
+
+            } else if (command && strcmp(command, "GET") == 0) {
+                char *key = strtok(NULL, "\n");
+
+                if (key) {
+                    if (strlen(key) > MAX_KEY_LEN) {
+                        write(client_fd, "ERROR: Key too long\n", 21);
+                        continue;
+                    }
+                    char *result = get(key);
+                    if (result) {
+                        write(client_fd, result, strlen(result));
+                        write(client_fd, "\n", 1);
+                    } else {
+                        write(client_fd, "NULL\n", 5);
+                    }
+                } else {
+                    write(client_fd, "ERROR: Invalid GET\n", 19);
+                }
+
+            } else if (command && strcmp(command, "DELETE") == 0) {
+                char *key = strtok(NULL, "\n");
+
+                if (key) {
+                    if (strlen(key) > MAX_KEY_LEN) {
+                        write(client_fd, "ERROR: Key too long\n", 21);
+                        continue;
+                    }
+                    delete(key);
+                    write(client_fd, "DELETED\n", 8);
+                } else {
+                    write(client_fd, "ERROR: Invalid DELETE\n", 23);
+                }
+
+            } else {
+                write(client_fd, "ERROR: Unknown command\n", 24);
+            }
         }
 
         close(client_fd);
